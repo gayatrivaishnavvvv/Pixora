@@ -7,6 +7,7 @@ export default function BeforeAfterPreview({
   processedUrl,
   canOpenEditor,
   isRemoving,
+  historyId,
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -22,11 +23,11 @@ export default function BeforeAfterPreview({
             Original
           </span>
         </div>
-        <div className="flex min-h-72 items-center justify-center bg-[#101116] p-4 sm:min-h-[26rem]">
+        <div className="flex min-h-72 items-center justify-center bg-[#101116] p-4 sm:min-h-104">
           <img
             src={preview.url}
             alt={`Local preview of ${preview.file.name}`}
-            className="max-h-[25rem] max-w-full rounded-md object-contain"
+            className="max-h-100 max-w-full rounded-md object-contain"
           />
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line px-4 py-3 text-xs text-muted">
@@ -59,21 +60,22 @@ export default function BeforeAfterPreview({
         </div>
         {processedUrl ? (
           <>
-            <div className="checkerboard flex min-h-72 items-center justify-center p-4 sm:min-h-[26rem]">
+            <div className="checkerboard flex min-h-72 items-center justify-center p-4 sm:min-h-104">
               <img
                 src={processedUrl}
                 alt={`Transparent background-removed result for ${preview.file.name}`}
-                className="max-h-[25rem] max-w-full object-contain"
+                className="max-h-100 max-w-full object-contain"
               />
             </div>
             <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
               <span className="flex items-center gap-2 text-xs text-muted">
                 <ImageIcon size={14} aria-hidden="true" />
-                Transparent PNG · temporary browser preview
+                Transparent PNG · saved in history
               </span>
               {canOpenEditor ? (
                 <Link
                   to="/editor"
+                  state={{ historyId }}
                   className={buttonClasses("primary", "ml-auto px-3 py-2 text-xs")}
                 >
                   Edit image
@@ -88,7 +90,7 @@ export default function BeforeAfterPreview({
           </>
         ) : (
           <>
-            <div className="checkerboard flex min-h-72 items-center justify-center p-4 sm:min-h-[26rem]">
+            <div className="checkerboard flex min-h-72 items-center justify-center p-4 sm:min-h-104">
               <div className="max-w-xs rounded-xl border border-line bg-canvas/90 p-6 text-center shadow-xl backdrop-blur-sm">
                 <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-line bg-surface text-accent">
                   {isRemoving ? (

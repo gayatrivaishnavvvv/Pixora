@@ -1,6 +1,7 @@
-import { Menu, X } from "lucide-react"
+import { LogOut, Menu, X } from "lucide-react"
 import { useState } from "react"
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
+import useAuth from "../../contexts/useAuth"
 import { buttonClasses } from "../ui/buttonClasses"
 import Container from "../ui/Container"
 import Logo from "./Logo"
@@ -44,12 +45,29 @@ function NavLinks({ pathname, hash, onNavigate, className }) {
 
 export default function Navbar() {
   const { pathname, hash } = useLocation()
+  const navigate = useNavigate()
+  const { user, signOut } = useAuth()
   const locationKey = `${pathname}${hash}`
   const [menu, setMenu] = useState({ key: locationKey, open: false })
+  const [logoutError, setLogoutError] = useState("")
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const open = menu.key === locationKey && menu.open
 
   function toggleMenu() {
     setMenu({ key: locationKey, open: !open })
+  }
+
+  async function handleSignOut() {
+    setLogoutError("")
+    setIsSigningOut(true)
+    try {
+      await signOut()
+      navigate("/")
+    } catch {
+      setLogoutError("Sign out could not be completed. Please try again.")
+    } finally {
+      setIsSigningOut(false)
+    }
   }
 
   return (
@@ -65,6 +83,43 @@ export default function Navbar() {
           <Link to="/workspace" className={buttonClasses("primary")}>
             Workspace
           </Link>
+          {user ? (
+            <>
+              <Link
+                to="/dashboard"
+                className={buttonClasses("secondary", "hidden px-3 py-2 sm:inline-flex")}
+              >
+                Dashboard
+              </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className={buttonClasses("secondary", "px-3 py-2 disabled:opacity-50")}
+                aria-label="Sign out"
+              >
+                <LogOut size={15} aria-hidden="true" />
+                <span className="hidden sm:inline">
+                  {isSigningOut ? "Signing out…" : "Sign out"}
+                </span>
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className={buttonClasses("secondary", "hidden px-3 py-2 sm:inline-flex")}
+              >
+                Sign in
+              </Link>
+              <Link
+                to="/register"
+                className={buttonClasses("secondary", "hidden px-3 py-2 sm:inline-flex")}
+              >
+                Register
+              </Link>
+            </>
+          )}
           <button
             type="button"
             className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-line bg-surface text-ink transition-colors hover:border-accent/50 md:hidden"
@@ -86,8 +141,48 @@ export default function Navbar() {
               onNavigate={() => setMenu({ key: locationKey, open: false })}
               className="flex flex-col gap-3"
             />
+            {user ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMenu({ key: locationKey, open: false })}
+                  className="text-sm font-medium text-muted hover:text-ink"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/profile"
+                  onClick={() => setMenu({ key: locationKey, open: false })}
+                  className="text-sm font-medium text-muted hover:text-ink"
+                >
+                  Profile
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setMenu({ key: locationKey, open: false })}
+                  className="text-sm font-medium text-muted hover:text-ink"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setMenu({ key: locationKey, open: false })}
+                  className="text-sm font-medium text-muted hover:text-ink"
+                >
+                  Register
+                </Link>
+              </>
+            )}
           </Container>
         </div>
+      ) : null}
+      {logoutError ? (
+        <p role="alert" className="border-t border-rose-400/20 bg-rose-400/10 px-4 py-2 text-center text-xs text-rose-200">
+          {logoutError}
+        </p>
       ) : null}
     </header>
   )

@@ -9,7 +9,7 @@ test("guest upload sessions create a verifiable scoped identity", () => {
   const session = createGuestSession(secret)
   const verified = verifyGuestSession(session.token, secret)
 
-  assert.equal(session.expiresIn, "1h")
+  assert.equal(session.expiresIn, "30d")
   assert.match(verified.sessionId, /^[0-9a-f-]{36}$/)
 })
 

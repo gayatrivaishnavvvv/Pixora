@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { Link, useLocation } from "react-router-dom"
 import {
   AlertCircle,
   FileImage,
@@ -13,16 +14,24 @@ import PageHeader from "../components/ui/PageHeader"
 import { buttonClasses } from "../components/ui/buttonClasses"
 import BeforeAfterPreview from "../components/workspace/BeforeAfterPreview"
 import {
+  completeHistoryProcessing,
+  createHistoryImage,
   deleteGuestUpload,
+  getHistoryImageAssets,
+  getHistoryImage,
   processBackgroundRemoval,
   uploadOriginalImage,
+  uploadProcessedImage,
 } from "../services/uploadApi"
 import { clearProcessedCutout, saveProcessedCutout } from "../services/imageEditorStorage"
+import useAuth from "../contexts/useAuth"
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
 export default function WorkspacePage() {
+  const { user } = useAuth()
+  const location = useLocation()
   const inputRef = useRef(null)
   const latestSelection = useRef(0)
   const [preview, setPreview] = useState(null)
@@ -32,10 +41,15 @@ export default function WorkspacePage() {
   const [isRemovingBackground, setIsRemovingBackground] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedAsset, setUploadedAsset] = useState(null)
+  const [historyRecordId, setHistoryRecordId] = useState("")
+  const [isLoadingHistory, setIsLoadingHistory] = useState(
+    Boolean(location.state?.historyId),
+  )
   const [processedUrl, setProcessedUrl] = useState("")
   const [canOpenEditor, setCanOpenEditor] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState("")
+  const [requiresAccount, setRequiresAccount] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -55,6 +69,77 @@ export default function WorkspacePage() {
     }
   }, [processedUrl])
 
+  useEffect(() => {
+    const historyId = location.state?.historyId
+    if (!historyId) return
+    let active = true
+    async function reopenImage() {
+      let originalUrl = ""
+      let nextProcessedUrl = ""
+      let committed = false
+      try {
+        const image = await getHistoryImage(historyId)
+        const assets = await getHistoryImageAssets(
+          historyId,
+          Boolean(image.processedPublicId),
+        )
+        originalUrl = URL.createObjectURL(assets.original)
+        if (assets.processed) {
+          nextProcessedUrl = URL.createObjectURL(assets.processed)
+          await saveProcessedCutout(assets.processed, image.originalFilename)
+        }
+        const nextPreview = {
+          file: { name: image.originalFilename, size: image.fileSize },
+          url: originalUrl,
+          width: image.dimensions.width,
+          height: image.dimensions.height,
+        }
+        if (!active) {
+          URL.revokeObjectURL(originalUrl)
+          if (nextProcessedUrl) URL.revokeObjectURL(nextProcessedUrl)
+          return
+        }
+        setPreview(nextPreview)
+        setUploadedAsset({
+          publicId: image.originalPublicId,
+          secureUrl: image.originalSecureUrl,
+          width: image.dimensions.width,
+          height: image.dimensions.height,
+          format: image.originalFormat,
+        })
+        setHistoryRecordId(image._id)
+        setProcessedUrl(nextProcessedUrl)
+        setCanOpenEditor(Boolean(assets.processed))
+        committed = true
+        try {
+          window.localStorage.setItem(
+            "pixora.image-editor.settings.v1",
+            JSON.stringify(image.backgroundSettings),
+          )
+        } catch {
+          setError("The image reopened, but its editing settings could not be restored.")
+        }
+      } catch (loadError) {
+        if (!committed) {
+          if (originalUrl) URL.revokeObjectURL(originalUrl)
+          if (nextProcessedUrl) URL.revokeObjectURL(nextProcessedUrl)
+        }
+        if (active) {
+          setError(
+            getErrorMessage(loadError, "This history image could not be reopened."),
+          )
+        }
+      } finally {
+        if (active) setIsLoadingHistory(false)
+      }
+    }
+
+    reopenImage()
+    return () => {
+      active = false
+    }
+  }, [location.state?.historyId])
+
   function chooseFile() {
     inputRef.current?.click()
   }
@@ -70,6 +155,7 @@ export default function WorkspacePage() {
     if (!ACCEPTED_TYPES.includes(file.type)) {
       latestSelection.current += 1
       setUploadedAsset(null)
+      setHistoryRecordId("")
       setError("Choose a JPG, PNG, or WEBP image.")
       setIsPreparing(false)
       return
@@ -137,14 +223,11 @@ export default function WorkspacePage() {
   async function clearPreview() {
     if (isUploading || isDeleting || isRemovingBackground) return
 
-    if (uploadedAsset) {
+    if (uploadedAsset && !historyRecordId) {
       setError("")
       setIsDeleting(true)
       try {
-        await deleteGuestUpload(
-          uploadedAsset.guestSessionToken,
-          uploadedAsset.publicId,
-        )
+        await deleteGuestUpload(uploadedAsset.publicId)
       } catch (deleteError) {
         setError(
           getErrorMessage(
@@ -161,6 +244,7 @@ export default function WorkspacePage() {
     latestSelection.current += 1
     setPreview(null)
     setUploadedAsset(null)
+    setHistoryRecordId("")
     setProcessedUrl("")
     setCanOpenEditor(false)
     clearProcessedCutout().catch(() => {
@@ -181,10 +265,20 @@ export default function WorkspacePage() {
 
     try {
       const upload = await uploadOriginalImage(preview.file, setUploadProgress)
+      let historyImage
+      try {
+        historyImage = await createHistoryImage(
+          upload.asset.publicId,
+          preview.file.name,
+        )
+      } catch (saveError) {
+        await deleteGuestUpload(upload.asset.publicId)
+        throw saveError
+      }
       setUploadedAsset({
         ...upload.asset,
-        guestSessionToken: upload.guestSessionToken,
       })
+      setHistoryRecordId(historyImage._id)
     } catch (uploadError) {
       setError(
         getErrorMessage(
@@ -210,6 +304,7 @@ export default function WorkspacePage() {
 
     const selectionId = latestSelection.current
     setError("")
+    setRequiresAccount(false)
 
     let asset = uploadedAsset
     if (!asset) {
@@ -217,11 +312,20 @@ export default function WorkspacePage() {
       setUploadProgress(0)
       try {
         const upload = await uploadOriginalImage(preview.file, setUploadProgress)
-        asset = {
-          ...upload.asset,
-          guestSessionToken: upload.guestSessionToken,
+        asset = upload.asset
+        let historyImage
+        try {
+          historyImage = await createHistoryImage(
+            asset.publicId,
+            preview.file.name,
+          )
+        } catch (saveError) {
+          await deleteGuestUpload(asset.publicId)
+          throw saveError
         }
         setUploadedAsset(asset)
+        setHistoryRecordId(historyImage._id)
+        asset.historyRecordId = historyImage._id
       } catch (uploadError) {
         setError(
           getErrorMessage(
@@ -238,10 +342,20 @@ export default function WorkspacePage() {
     setIsRemovingBackground(true)
 
     try {
-      const result = await processBackgroundRemoval(
-        asset.guestSessionToken,
-        asset.publicId,
-      )
+      const result = await processBackgroundRemoval(asset.publicId)
+      const processedFilename = `${preview.file.name.replace(/\.[^.]+$/, "") || "pixora-image"}.png`
+      const processedAsset = await uploadProcessedImage(result, processedFilename)
+      const historyId = historyRecordId || asset.historyRecordId
+      if (!historyId) {
+        await deleteGuestUpload(processedAsset.publicId)
+        throw new Error("The uploaded image could not be found in history.")
+      }
+      try {
+        await completeHistoryProcessing(historyId, processedAsset.publicId)
+      } catch (saveError) {
+        await deleteGuestUpload(processedAsset.publicId)
+        throw saveError
+      }
       const resultUrl = URL.createObjectURL(result)
       if (selectionId !== latestSelection.current) {
         URL.revokeObjectURL(resultUrl)
@@ -258,6 +372,7 @@ export default function WorkspacePage() {
         )
       }
     } catch (removeError) {
+      setRequiresAccount(removeError.code === "GUEST_PROCESSING_LIMIT")
       setError(
         getErrorMessage(
           removeError,
@@ -273,9 +388,19 @@ export default function WorkspacePage() {
     <Container className="max-w-7xl py-10 sm:py-14">
       <PageHeader eyebrow="Workspace · Background removal" title="Image workspace">
         {uploadedAsset
-          ? "Your original is stored in Cloudinary. Choose Remove background to send it to remove.bg and create a transparent PNG."
+          ? "Your original is stored in your secure image history. Choose Remove background to create a transparent PNG."
           : "Choose an image to preview it beside the transparent-result canvas. Remove background will upload it and create a transparent PNG."}
       </PageHeader>
+
+      {!user ? (
+        <p className="mt-5 rounded-xl border border-accent/20 bg-accent/10 px-4 py-3 text-sm text-muted">
+          Try background removal on 2 images as a guest.{" "}
+          <Link to="/register" className="font-medium text-accent hover:text-accent-hover">
+            Create an account
+          </Link>{" "}
+          or sign in to process more.
+        </p>
+      ) : null}
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/80 px-4 py-3 backdrop-blur-sm">
         <p className="flex items-center gap-2 text-sm text-muted">
@@ -392,7 +517,9 @@ export default function WorkspacePage() {
                 onClick={clearPreview}
                 title={
                   uploadedAsset
-                    ? "Delete the uploaded image from Cloudinary and clear the preview"
+                    ? historyRecordId
+                      ? "Clear the workspace without deleting this history image"
+                      : "Delete the uploaded image from Cloudinary and clear the preview"
                     : "Clear the selected image preview"
                 }
               >
@@ -401,7 +528,13 @@ export default function WorkspacePage() {
                 ) : (
                   <X size={15} aria-hidden="true" />
                 )}
-                {isDeleting ? "Deleting…" : uploadedAsset ? "Delete image" : "Clear image"}
+                {isDeleting
+                  ? "Deleting…"
+                  : uploadedAsset
+                    ? historyRecordId
+                      ? "Clear workspace"
+                      : "Delete image"
+                    : "Clear image"}
               </button>
             </div>
           ) : null}
@@ -419,8 +552,8 @@ export default function WorkspacePage() {
             className="border-b border-line px-4 py-2 text-xs text-muted sm:px-5"
           >
             When you choose Remove background, Pixora sends this uploaded image to
-            remove.bg for processing. The returned PNG is shown temporarily in
-            this browser and is not saved to Cloudinary.
+            remove.bg. Both the original and processed PNG are retained in
+            {user ? " your account history until deleted." : " guest history for 30 days."}
           </p>
         ) : null}
         {uploadedAsset ? (
@@ -431,13 +564,48 @@ export default function WorkspacePage() {
         ) : null}
         <div className="p-3 sm:p-5">
           {error ? (
-            <p
+            <div
               role="alert"
               className="mb-4 flex items-start gap-2 rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2.5 text-sm text-rose-200"
             >
               <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
-              {error}
-            </p>
+              <div>
+                <p>{error}</p>
+                {requiresAccount ? (
+                  <p className="mt-2">
+                    <Link
+                      to="/register"
+                      state={{
+                        from: {
+                          pathname: "/workspace",
+                          state: historyRecordId
+                            ? { historyId: historyRecordId }
+                            : undefined,
+                        },
+                      }}
+                      className="font-medium text-accent underline hover:text-accent-hover"
+                    >
+                      Create a free account
+                    </Link>
+                    {" · "}
+                    <Link
+                      to="/login"
+                      state={{
+                        from: {
+                          pathname: "/workspace",
+                          state: historyRecordId
+                            ? { historyId: historyRecordId }
+                            : undefined,
+                        },
+                      }}
+                      className="font-medium text-accent underline hover:text-accent-hover"
+                    >
+                      Sign in
+                    </Link>
+                  </p>
+                ) : null}
+              </div>
+            </div>
           ) : null}
 
           {isPreparing ? (
@@ -447,6 +615,12 @@ export default function WorkspacePage() {
             >
               <LoaderCircle size={17} className="animate-spin" aria-hidden="true" />
               Preparing a local preview…
+            </p>
+          ) : null}
+          {isLoadingHistory ? (
+            <p role="status" className="mb-4 flex items-center gap-2 text-sm text-muted">
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+              Reopening your saved image…
             </p>
           ) : null}
           {isUploading ? (
@@ -488,7 +662,7 @@ export default function WorkspacePage() {
               Deleting the uploaded image from Cloudinary…
             </p>
           ) : null}
-          {uploadedAsset ? (
+            {uploadedAsset ? (
             <p className="mb-4 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5 text-sm text-emerald-200">
               Original uploaded to Cloudinary and verified by the backend.
               {processedUrl
@@ -504,6 +678,7 @@ export default function WorkspacePage() {
                 processedUrl={processedUrl}
                 canOpenEditor={canOpenEditor}
                 isRemoving={isRemovingBackground}
+                historyId={historyRecordId}
               />
             </div>
           ) : (
@@ -563,9 +738,11 @@ export default function WorkspacePage() {
       </section>
 
       <p className="mt-4 text-center text-xs leading-5 text-muted">
-        Uploading and AI processing are separate actions. The original is stored
-        in Cloudinary; the generated PNG is temporary and not saved to an account
-        history.
+        {user
+          ? "Account image history is stored in MongoDB and Cloudinary until deleted. "
+          : "Guest image history is stored in MongoDB and Cloudinary for 30 days. "}
+        Clear the workspace to leave history intact, or delete the image from the
+        History page to remove its assets.
       </p>
     </Container>
   )

@@ -1,21 +1,28 @@
 import { Router } from "express"
 import rateLimit from "express-rate-limit"
 import { createUploadController } from "../controllers/upload.controller.js"
+import { optionalAuthentication } from "../middleware/requireAuthentication.js"
 import { requireGuestSession } from "../middleware/requireGuestSession.js"
+import { GuestProcessingUsage } from "../models/GuestProcessingUsage.js"
+import { User } from "../models/User.js"
 import { removeImageBackground } from "../services/backgroundRemoval.service.js"
 
 export function createUploadRouter(
   config,
   cloudinaryClient,
   backgroundRemovalService = removeImageBackground,
+  processingUsageModel = GuestProcessingUsage,
+  userModel = User,
 ) {
   const router = Router()
   const controller = createUploadController(
     config,
     cloudinaryClient,
     backgroundRemovalService,
+    processingUsageModel,
   )
   const guestSession = requireGuestSession(config.uploadSessionSecret)
+  const optionalUser = optionalAuthentication(config.authSessionSecret, userModel)
   const sessionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 10,
@@ -45,6 +52,7 @@ export function createUploadRouter(
     "/remove-background",
     processingLimiter,
     guestSession,
+    optionalUser,
     controller.removeBackground,
   )
   router.delete("/asset", uploadLimiter, guestSession, controller.deleteUpload)

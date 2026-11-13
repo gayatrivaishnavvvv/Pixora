@@ -93,3 +93,21 @@ export async function deleteOwnedGuestImage({ client, sessionId, publicId }) {
     throw error
   }
 }
+
+export async function deleteGuestImageAsset({ client, sessionId, publicId }) {
+  if (!isOwnedGuestPublicId(sessionId, publicId)) {
+    const error = new Error("This image does not belong to the current guest session.")
+    error.statusCode = 403
+    throw error
+  }
+
+  const result = await client.uploader.destroy(publicId, {
+    resource_type: "image",
+    invalidate: true,
+  })
+  if (result.result !== "ok" && result.result !== "not found") {
+    const error = new Error("Cloudinary did not confirm image deletion.")
+    error.statusCode = 502
+    throw error
+  }
+}

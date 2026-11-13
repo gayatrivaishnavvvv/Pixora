@@ -5,27 +5,32 @@ const items = [
   {
     question: "Which files can I use?",
     answer:
-      "The preview accepts JPG, PNG, and WEBP files up to 10 MB. It checks the file type and size in your browser and does not upload or store it.",
+      "Workspace accepts JPG, PNG, and WEBP images up to 10 MB. The interactive preview on this landing page stays local and does not upload files.",
   },
   {
     question: "Does background removal work yet?",
     answer:
-      "Not yet. The page shows the planned experience, but it does not process images. A real background-removal provider will be connected in a later phase.",
+      "Yes. Workspace sends verified uploads to remove.bg for processing. The backend needs a REMOVE_BG_API_KEY and the app needs its MongoDB and Cloudinary settings configured.",
+  },
+  {
+    question: "How many images can I process as a guest?",
+    answer:
+      "Guests can remove backgrounds from two distinct images in a guest session. Create a free account or sign in to process more images.",
   },
   {
     question: "Where will uploaded images go?",
     answer:
-      "The planned upload flow sends images directly from your browser to Cloudinary using signed parameters from the backend. No image upload is active in this preview.",
+      "Workspace uploads originals and processed PNGs to Cloudinary and saves their metadata in MongoDB. Guest history is retained for 30 days; account history remains until you delete it.",
   },
   {
     question: "Will I be able to edit an image later?",
     answer:
-      "A history library is planned to let you reopen the original and processed image. It is not connected yet, and this page does not use sample history.",
+      "Yes. Open History to preview a saved original and cutout, then continue editing without uploading the original again. Your saved editing settings are restored when available.",
   },
   {
     question: "Can I change the background without processing again?",
     answer:
-      "That is the plan: once an image has a transparent cutout, changing its background should reuse that cutout. Editing and downloads are not available yet.",
+      "Yes. The editor reuses the saved transparent cutout for background changes, placement, and exports without rerunning background removal.",
   },
 ]
 

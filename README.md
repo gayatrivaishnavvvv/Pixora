@@ -64,5 +64,9 @@ npm test
 
 The Cloudinary upload path stores the original. Background removal is handled by
 remove.bg through the backend; add `REMOVE_BG_API_KEY` to `backend/.env` to
-enable it. Processed PNGs are temporary in the browser and are not stored in
-Cloudinary.
+enable it. Guests can process two images per guest session; registration unlocks
+additional processing. Email/password and Google sign-in are supported. Google
+sign-in requires the same Google OAuth client ID in `backend/.env` and
+`frontend/.env`. Guest image history is stored in MongoDB with original and
+processed assets in Cloudinary. Guest histories expire after 30 days; see
+[backend/README.md](./backend/README.md) for session and cleanup details.

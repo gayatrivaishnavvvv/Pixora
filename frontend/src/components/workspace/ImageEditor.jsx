@@ -17,15 +17,17 @@ import {
   saveCustomBackground,
   saveEditingSettings,
 } from "../../services/imageEditorStorage"
+import { saveHistorySettings } from "../../services/uploadApi"
 
 const MAX_BACKGROUND_SIZE = 10 * 1024 * 1024
 const ACCEPTED_BACKGROUND_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
-export default function ImageEditor({ processedUrl, imageName, onError }) {
+export default function ImageEditor({ processedUrl, imageName, historyId, onError }) {
   const [settings, setSettings] = useState(DEFAULT_EDITING_SETTINGS)
   const [customBackground, setCustomBackground] = useState(null)
   const [imageSize, setImageSize] = useState(null)
   const [isReady, setIsReady] = useState(false)
+  const [hasChanged, setHasChanged] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [backgroundInputKey, setBackgroundInputKey] = useState(0)
 
@@ -73,6 +75,7 @@ export default function ImageEditor({ processedUrl, imageName, onError }) {
 
       if (!active) return
       setSettings(normalizeEditingSettings(restoredSettings))
+      setHasChanged(false)
       setIsReady(true)
       if (restoreError) onError(restoreError)
     }
@@ -92,6 +95,16 @@ export default function ImageEditor({ processedUrl, imageName, onError }) {
       onError("Editing settings could not be saved in this browser.")
     }
   }, [isReady, onError, settings])
+
+  useEffect(() => {
+    if (!isReady || !hasChanged || !historyId) return
+    const timer = window.setTimeout(() => {
+      saveHistorySettings(historyId, settings).catch(() => {
+        onError("Editing settings could not be saved to image history.")
+      })
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [hasChanged, historyId, isReady, onError, settings])
 
   useEffect(() => {
     return () => {
@@ -117,6 +130,7 @@ export default function ImageEditor({ processedUrl, imageName, onError }) {
   }, [onError, processedUrl])
 
   function updateSettings(changes) {
+    setHasChanged(true)
     setSettings((current) => ({ ...current, ...changes }))
   }
 
@@ -158,6 +172,7 @@ export default function ImageEditor({ processedUrl, imageName, onError }) {
   async function resetEditor() {
     onError("")
     setSettings({ ...DEFAULT_EDITING_SETTINGS })
+    setHasChanged(true)
     setCustomBackground(null)
     setBackgroundInputKey((key) => key + 1)
     try {

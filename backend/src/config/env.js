@@ -20,9 +20,18 @@ export function getServerConfig() {
   if (uploadSessionSecret.length < 32) {
     throw new Error("UPLOAD_SESSION_SECRET must be at least 32 characters long.")
   }
+  const authSessionSecret = getRequiredEnv("AUTH_SESSION_SECRET")
+  if (authSessionSecret.length < 32) {
+    throw new Error("AUTH_SESSION_SECRET must be at least 32 characters long.")
+  }
+  if (authSessionSecret === uploadSessionSecret) {
+    throw new Error("AUTH_SESSION_SECRET and UPLOAD_SESSION_SECRET must be different.")
+  }
 
   return {
     port,
+    cookieSecure: process.env.NODE_ENV === "production",
+    cookieSameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     frontendOrigins: (process.env.FRONTEND_URL ??
       "http://localhost:5173,http://127.0.0.1:5173")
       .split(",")
@@ -30,6 +39,8 @@ export function getServerConfig() {
       .filter(Boolean),
     mongoUri: getRequiredEnv("MONGODB_URI"),
     uploadSessionSecret,
+    authSessionSecret,
+    googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() ?? "",
     removeBgApiKey: process.env.REMOVE_BG_API_KEY?.trim() ?? "",
     cloudinary: {
       cloudName: getRequiredEnv("CLOUDINARY_CLOUD_NAME"),

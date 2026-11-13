@@ -98,7 +98,7 @@ export default function UploadPreview() {
         Open workspace
       </Link>
       <p className="mt-3 text-center text-xs leading-5 text-muted">
-        Preview only. Upload and background removal are not connected yet.
+        This landing-page preview stays local. Open Workspace to upload and process an image.
       </p>
     </div>
   )

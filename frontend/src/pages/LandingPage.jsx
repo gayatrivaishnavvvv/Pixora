@@ -18,17 +18,17 @@ const steps = [
   {
     number: "01",
     title: "Choose an image",
-    text: "Start with a JPG, PNG, or WEBP. The preview checks the file locally; it does not upload it.",
+    text: "Choose a JPG, PNG, or WEBP in Workspace. The landing-page preview remains local until you open the workspace.",
   },
   {
     number: "02",
     title: "Remove the background",
-    text: "A real background-removal provider will create a transparent cutout. That connection is not active yet.",
+    text: "Workspace sends the verified original to remove.bg and stores the resulting transparent cutout in your history.",
   },
   {
     number: "03",
     title: "Make it yours",
-    text: "Set a new background, review the result, and export when editing is connected.",
+    text: "Set a new background, compare the result, and export your edit from the workspace.",
   },
 ]
 
@@ -36,7 +36,7 @@ const features = [
   {
     icon: ScanLine,
     title: "A clean transparent cutout",
-    text: "The planned AI integration will return a transparent PNG, ready to use on a new background.",
+    text: "Remove the background in Workspace to create a transparent PNG, ready to use on a new background.",
   },
   {
     icon: Layers,
@@ -56,12 +56,12 @@ const features = [
   {
     icon: FolderClock,
     title: "Pick up where you left off",
-    text: "A history library is planned so you can reopen an image and continue editing.",
+    text: "Open History to return to a saved original and cutout, then continue editing without another upload.",
   },
   {
     icon: ShieldCheck,
     title: "Storage with clear boundaries",
-    text: "The planned upload flow sends files to Cloudinary directly, using signed parameters from the backend.",
+    text: "Guests can process two images per session. Create an account to process more and keep your history.",
   },
 ]
 
@@ -98,7 +98,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="hero-note mt-4 text-xs text-muted">
-              Preview only · Upload and background removal are not connected yet
+              Illustration only · Open Workspace for live uploads and editing
             </p>
           </div>
 
@@ -155,7 +155,7 @@ export default function LandingPage() {
               <div>
                 <p className="text-sm font-medium text-ink">Studio preview</p>
                 <p className="mt-0.5 text-xs text-muted">
-                  A look at the planned upload and comparison workflow
+                  An illustration of the upload and comparison workflow
                 </p>
               </div>
               <span className="inline-flex items-center gap-2 rounded-full border border-line bg-canvas px-3 py-1.5 text-xs text-muted">
@@ -264,7 +264,7 @@ export default function LandingPage() {
               A few things to know
             </h2>
             <p className="mt-3 leading-7 text-muted">
-              Clear answers about what works today and what is still planned.
+              Clear answers about Workspace, image processing, and guest history.
             </p>
           </div>
           <FaqList />

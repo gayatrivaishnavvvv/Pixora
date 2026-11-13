@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { AlertCircle, ArrowLeft, LoaderCircle } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import ImageEditor from "../components/workspace/ImageEditor"
 import Container from "../components/ui/Container"
 import PageHeader from "../components/ui/PageHeader"
@@ -8,6 +8,7 @@ import { buttonClasses } from "../components/ui/buttonClasses"
 import { loadProcessedCutout } from "../services/imageEditorStorage"
 
 export default function ImageEditorPage() {
+  const location = useLocation()
   const [cutout, setCutout] = useState(null)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(true)
@@ -94,6 +95,7 @@ export default function ImageEditorPage() {
             <ImageEditor
               processedUrl={cutout.url}
               imageName={cutout.imageName}
+              historyId={location.state?.historyId}
               onError={setError}
             />
           </div>
